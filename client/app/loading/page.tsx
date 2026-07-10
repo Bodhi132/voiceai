@@ -28,7 +28,8 @@ export default function LoadingPage() {
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await fetch("http://localhost:8000/transcribe", {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const response = await fetch(`${API_URL}/transcribe`, {
           method: "POST",
           body: formData,
         });
