@@ -1,16 +1,16 @@
 # VoiceAI - AI Pronunciation Assessment Tool
 
-VoiceAI is a full-stack web application designed to help non-native English speakers improve their pronunciation. By leveraging local machine learning models and cloud-based LLMs, it provides a highly detailed, word-by-word breakdown of a user's spoken English compared to standard textbook pronunciation, complete with actionable coaching feedback.
+VoiceAI is a full-stack web application designed to help non-native English speakers improve their pronunciation. By leveraging highly optimized local ONNX models and cloud-based LLMs, it provides a highly detailed, word-by-word breakdown of a user's spoken English compared to standard textbook pronunciation, complete with actionable coaching feedback.
 
 ## 🚀 Features
 
-- **Language Validation**: Ensures the uploaded audio is actually English using Whisper before processing.
-- **Word-Level Timestamps**: Uses `faster-whisper` to transcribe audio and locate the exact start and end timestamps of every spoken word.
+- **Blazing Fast Transcription**: Uses the **Groq API** (`whisper-large-v3`) to instantly transcribe audio and locate the exact start and end timestamps of every spoken word, while verifying the language is English.
 - **Phoneme Alignment & Scoring**:
-  - Compares the **Expected Pronunciation** (using `cmudict` or `g2p_en` neural fallback for proper nouns) against the **Actual Pronunciation** (extracted from the raw audio using a `Wav2Vec2` phoneme model).
-  - Scores every individual word using Levenshtein distance matching on the phonemes.
-- **AI Speech Coach**: Synthesizes the phonetic errors and overall score using the Groq API (Llama 3.1) to generate a customized, encouraging practice routine without hallucinating errors.
-- **Beautiful UI**: Built with Next.js and Tailwind CSS, featuring smooth micro-interactions powered by Framer Motion.
+  - Compares the **Expected Pronunciation** (using `cmudict` or a `g2p_en` neural fallback for proper nouns) against the **Actual Pronunciation**.
+  - **Memory-Optimized Local Inference**: Extracts actual phonemes from raw audio using a `Wav2Vec2` model (`vitouphy/wav2vec2-xls-r-300m-phoneme`). To fit into strict free-tier cloud environments, the 1.2 GB PyTorch model is mathematically compressed into a highly optimized 400 MB **INT8 ONNX graph**, allowing it to run entirely on the CPU with minimal RAM.
+  - Scores every individual word using Levenshtein distance matching on the phonetic sounds.
+- **AI Speech Coach**: Analyzes phonetic errors and overall scores using the Groq API (Llama 3) to generate a customized, encouraging practice routine.
+- **Beautiful UI**: Built with Next.js and Tailwind CSS, featuring smooth micro-interactions powered by Framer Motion and a detailed results dashboard.
 
 ---
 
@@ -32,29 +32,34 @@ flowchart TD
     subgraph Server ["FastAPI Backend (Python)"]
         direction TB
         MainRouter["main.py\n(API Router)"]:::backend
-        
-        Transcriber["TranscriptionService\n(faster-whisper)"]:::aiModel
-        ExpectedPhonemes["ExpectedPhonemeService\n(cmudict & g2p_en)"]:::aiModel
-        ActualPhonemes["PhonemeService\n(Wav2Vec2)"]:::aiModel
-        Scorer["ScoringService\n(NLTK)"]:::backend
-        Feedback["FeedbackService\n(Groq)"]:::backend
+        ExpectedPhonemes["ExpectedPhonemeService\n(g2p_en)"]:::aiModel
+        ActualPhonemes["PhonemeService\n(ONNX INT8 Wav2Vec2)"]:::aiModel
+        Scorer["ScoringService\n(Levenshtein)"]:::backend
     end
 
     subgraph Cloud ["External Cloud APIs"]
-        Groq["Groq API\n(Llama-3.1-8b)"]:::external
+        Groq["Groq API\n(Whisper-V3 & Llama-3)"]:::external
     end
 
     UploadPage -- "Audio" --> MainRouter
-    MainRouter -- "Clean Audio" --> Transcriber
-    Transcriber -- "Transcript & Timestamps" --> ExpectedPhonemes
-    Transcriber -- "Sliced Audio" --> ActualPhonemes
+    MainRouter -- "Audio" --> Groq
+    Groq -- "Transcript & Timestamps" --> ExpectedPhonemes
+    MainRouter -- "Sliced Audio" --> ActualPhonemes
     ExpectedPhonemes -- "Expected Sounds" --> Scorer
     ActualPhonemes -- "Actual Sounds" --> Scorer
-    Scorer -- "Word Scores" --> Feedback
-    Feedback -- "Prompt" --> Groq
-    Groq -- "AI Feedback" --> Feedback
-    Feedback -- "Final JSON Payload" --> ResultsPage
+    Scorer -- "Word Scores" --> Groq
+    Groq -- "AI Coaching Feedback" --> ResultsPage
 ```
+
+---
+
+## ☁️ Deployment & CI/CD Strategy
+
+To successfully deploy this memory-heavy AI application for free, a highly customized Continuous Integration (CI/CD) pipeline was built:
+
+- **Frontend**: Deployed seamlessly on **Render**.
+- **Backend**: Hosted on **Azure App Service (Linux)**.
+- **GitHub Actions (The Secret Sauce)**: Azure's B1 tier has a strict 1.75 GB RAM limit and a 230-second startup timeout. Trying to download and quantize a 1.2 GB PyTorch model on Azure caused immediate `Out of Memory` crashes. To bypass this, a custom **GitHub Actions workflow** intercepts code pushes. GitHub's powerful 7 GB RAM runner downloads the PyTorch model, executes the `export_onnx.py` script to mathematically compress it into INT8 ONNX files, and packages the lightweight result directly to Azure. Azure simply boots up `uvicorn` and serves the API effortlessly!
 
 ---
 
@@ -68,11 +73,10 @@ flowchart TD
 
 **Backend:**
 - [FastAPI](https://fastapi.tiangolo.com/) (Python)
-- [FFmpeg](https://ffmpeg.org/) (Audio normalization)
-- [faster-whisper](https://github.com/guillaumekln/faster-whisper) (Transcription & Timestamps)
-- [Hugging Face Transformers](https://huggingface.co/) (`vitouphy/wav2vec2-xls-r-300m-phoneme`)
+- ONNX Runtime (CPU Inference)
+- Numpy
 - `g2p_en` & `nltk` (Expected Phonemes)
-- [Groq API](https://groq.com/) (Llama-3.1-8b for Speech Coach Feedback)
+- [Groq API](https://groq.com/) (Whisper for transcription, Llama 3 for Speech Coach Feedback)
 
 ---
 
@@ -93,10 +97,12 @@ python -m venv venv
 source venv/bin/activate  # On Windows use `venv\Scripts\activate`
 ```
 
-Install the requirements:
+Install the requirements and generate the ONNX model:
 
 ```bash
-pip install -r requirements.txt
+pip install torch transformers onnx onnxruntime onnxscript -r requirements.txt
+python export_onnx.py
+pip uninstall -y torch transformers onnxscript
 ```
 
 Create a `.env` file in the `backend/` folder and add your Groq API key:
@@ -127,16 +133,6 @@ Start the Next.js development server:
 npm run dev
 ```
 *(The frontend will be available at `http://localhost:3000`)*
-
----
-
-## 🧠 How the Phoneme Matching Works
-
-1. The backend relies on **Whisper** to provide accurate, word-by-word timestamps. 
-2. It slices the original audio file into tiny chunks—one chunk per word.
-3. It passes the text of the word to an **Expected Phoneme** dictionary (`cmudict` with a `g2p_en` neural fallback for proper nouns).
-4. It passes the audio chunk of the word to the **Actual Phoneme** Wav2Vec2 model to extract exactly how the user sounded.
-5. It computes the **Levenshtein distance** between the two arrays of phonetic sounds to score the word.
 
 ---
 
