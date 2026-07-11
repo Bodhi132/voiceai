@@ -1,7 +1,5 @@
-torch
-torchaudio
-transformers
-faster-whisper
+onnxruntime
+numpy
 fastapi
 uvicorn
 python-multipart

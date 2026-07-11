@@ -11,8 +11,14 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+.venv/
 env/
 .env
+
+# Model Files (GitHub limits files to 100MB)
+*.onnx
+*.onnx.data
+test_dummy.wav
 
 # VoiceAI Specific
 temp_uploads/
