@@ -113,8 +113,8 @@ function ScoreRing({ score }: { score: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-5xl font-extrabold text-[#111827] tracking-tight leading-none">
-          {score}%
+        <span className="text-4xl font-extrabold text-[#111827] tracking-tight flex items-baseline gap-1">
+          {score} <span className="text-2xl font-bold text-[#676C73]">%</span>
         </span>
       </div>
     </div>
