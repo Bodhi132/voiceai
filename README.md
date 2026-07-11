@@ -23,32 +23,45 @@ flowchart TD
     classDef external fill:#F59E0B,stroke:#D97706,stroke-width:2px,color:white;
     classDef aiModel fill:#8B5CF6,stroke:#7C3AED,stroke-width:2px,color:white;
 
-    subgraph Client ["Next.js Frontend (React)"]
+    subgraph Client ["Next.js Frontend (Deployed on Render)"]
         direction TB
-        UploadPage["Upload UI"]:::frontend
-        ResultsPage["Results Dashboard"]:::frontend
+        UploadPage["Upload UI\n(Audio Capture)"]:::frontend
+        ResultsPage["Results Dashboard\n(Score & Feedback)"]:::frontend
     end
 
-    subgraph Server ["FastAPI Backend (Python)"]
+    subgraph Server ["FastAPI Backend (Deployed on Azure App Service)"]
         direction TB
         MainRouter["main.py\n(API Router)"]:::backend
-        ExpectedPhonemes["ExpectedPhonemeService\n(g2p_en)"]:::aiModel
+        FFmpeg["FFmpeg\n(Audio Normalization)"]:::backend
+        ExpectedPhonemes["ExpectedPhonemeService\n(g2p_en & cmudict)"]:::aiModel
         ActualPhonemes["PhonemeService\n(ONNX INT8 Wav2Vec2)"]:::aiModel
-        Scorer["ScoringService\n(Levenshtein)"]:::backend
+        Scorer["ScoringService\n(Levenshtein Distance)"]:::backend
+        Feedback["FeedbackService\n(Prompt Generation)"]:::backend
     end
 
-    subgraph Cloud ["External Cloud APIs"]
-        Groq["Groq API\n(Whisper-V3 & Llama-3)"]:::external
+    subgraph Cloud ["Groq Cloud APIs"]
+        GroqWhisper["Whisper-large-v3\n(Transcribe & Timestamps)"]:::external
+        GroqLlama["Llama-3\n(AI Speech Coach)"]:::external
     end
 
-    UploadPage -- "Audio" --> MainRouter
-    MainRouter -- "Audio" --> Groq
-    Groq -- "Transcript & Timestamps" --> ExpectedPhonemes
-    MainRouter -- "Sliced Audio" --> ActualPhonemes
+    UploadPage -- "1. Upload Audio" --> MainRouter
+    MainRouter -- "2. Normalize Audio" --> FFmpeg
+    FFmpeg -- "3. Clean Audio" --> MainRouter
+    
+    MainRouter -- "4. Check Language & Transcribe" --> GroqWhisper
+    GroqWhisper -- "5. Transcript & Timestamps" --> MainRouter
+    
+    MainRouter -- "6. Send Word Text" --> ExpectedPhonemes
+    MainRouter -- "7. Sliced Audio Chunks" --> ActualPhonemes
+    
     ExpectedPhonemes -- "Expected Sounds" --> Scorer
     ActualPhonemes -- "Actual Sounds" --> Scorer
-    Scorer -- "Word Scores" --> Groq
-    Groq -- "AI Coaching Feedback" --> ResultsPage
+    
+    Scorer -- "8. Word Scores" --> Feedback
+    Feedback -- "9. Generate Prompt" --> GroqLlama
+    GroqLlama -- "10. AI Coaching Feedback" --> Feedback
+    
+    Feedback -- "11. Final JSON Payload" --> ResultsPage
 ```
 
 ---
