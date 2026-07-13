@@ -68,11 +68,12 @@ flowchart TD
 
 ## ☁️ Deployment & CI/CD Strategy
 
-To successfully deploy this memory-heavy AI application for free, a highly customized Continuous Integration (CI/CD) pipeline was built:
+To successfully deploy this memory-heavy AI application for free, a highly customized Continuous Integration (CI/CD) pipeline was built to navigate strict cloud memory limits:
 
 - **Frontend**: Deployed seamlessly on **Render**.
 - **Backend**: Hosted on **Azure App Service (Linux)**.
-- **GitHub Actions (The Secret Sauce)**: Azure's B1 tier has a strict 1.75 GB RAM limit and a 230-second startup timeout. Trying to download and quantize a 1.2 GB PyTorch model on Azure caused immediate `Out of Memory` crashes. To bypass this, a custom **GitHub Actions workflow** intercepts code pushes. GitHub's powerful 7 GB RAM runner downloads the PyTorch model, executes the `export_onnx.py` script to mathematically compress it into INT8 ONNX files, and packages the lightweight result directly to Azure. Azure simply boots up `uvicorn` and serves the API effortlessly!
+- **The Memory Challenge**: Initially, we attempted to deploy the FastAPI backend on **Render's Free Tier**, but the strict 512 MB RAM limit caused immediate `Out of Memory` crashes when attempting to load the PyTorch machine learning models. We then pivoted to Azure's B1 tier (which offers 1.75 GB of RAM). However, Azure also struggled and timed out when trying to download and compile the massive 1.2 GB PyTorch models during the deployment build phase. 
+- **GitHub Actions (The Secret Sauce)**: To bypass all cloud memory constraints, a custom **GitHub Actions workflow** was engineered to intercept code pushes. We hijacked GitHub's powerful 7 GB RAM runner to act as a remote build server. The GitHub runner downloads the heavy PyTorch model, executes the `export_onnx.py` script to mathematically compress it into INT8 ONNX files, and packages only the lightweight, 400 MB result directly to Azure. Azure simply boots up `uvicorn` and serves the highly-optimized API effortlessly!
 
 ---
 

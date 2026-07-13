@@ -120,62 +120,26 @@ export default function AudioUpload() {
     setIsProcessing(true);
     setError(null);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${API_URL}/detect-language`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        throw new Error("Language detection failed.");
-      }
-
-      const data = await res.json();
-      
-      if (data.language !== "en" || data.probability < 0.5) {
-        const probDisplay = Math.round(data.probability * 100);
-        let languageName = data.language;
-        try {
-          languageName = new Intl.DisplayNames(['en'], { type: 'language' }).of(data.language) || data.language;
-        } catch (e) {
-          // Fallback if language code is invalid
-        }
-        setError(`This tool requires English speech. Detected language: ${languageName}. Please upload an English recording.`);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        sessionStorage.clear(); // Clear old values
+        sessionStorage.setItem("audio_data", reader.result as string);
+        sessionStorage.setItem("audio_name", file.name);
+        
+        // Navigate to the loader page which will process the file
+        router.push("/loading");
+      } catch (e) {
+        console.error("Storage error:", e);
+        setError("Audio file is too large to process. Please use a smaller clip (30-45 seconds).");
         setIsProcessing(false);
-        return;
       }
-
-      // If valid English, proceed to read and store
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          sessionStorage.clear(); // Clear old values
-          sessionStorage.setItem("audio_data", reader.result as string);
-          sessionStorage.setItem("audio_name", file.name);
-          
-          // Navigate to the loader page which will process the file
-          router.push("/loading");
-        } catch (e) {
-          console.error("Storage error:", e);
-          setError("Audio file is too large to process. Please use a smaller clip (30-45 seconds).");
-          setIsProcessing(false);
-        }
-      };
-      reader.onerror = () => {
-        setError("Failed to read the audio file.");
-        setIsProcessing(false);
-      };
-      reader.readAsDataURL(file);
-
-    } catch (err: any) {
-      console.error("Detection error:", err);
-      setError(err.message || "An error occurred checking the language.");
+    };
+    reader.onerror = () => {
+      setError("Failed to read the audio file.");
       setIsProcessing(false);
-    }
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -268,7 +232,7 @@ export default function AudioUpload() {
             onClick={handleUploadWrapper}
             className="w-full mt-6 flex justify-center items-center bg-[#51BC8F] hover:bg-[#46a77e] disabled:bg-[#E3E5EA] text-white disabled:text-[#AEB2B9] font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)] disabled:shadow-none disabled:cursor-not-allowed cursor-pointer text-[15px]"
           >
-            {isProcessing ? "Reading file..." : "Analyze Pronunciation"}
+            {isProcessing ? "Processing..." : "Analyze Pronunciation"}
           </button>
 
           {durationWarning && (

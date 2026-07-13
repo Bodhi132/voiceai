@@ -14,7 +14,7 @@ const loadingMessages = [
   "Compiling pronunciation score breakdown...",
 ];
 
-export default function LoadingScreen() {
+export default function LoadingScreen({ step = "transcribing" }: { step?: "detecting" | "transcribing" }) {
   const [loadingIndex, setLoadingIndex] = useState(0);
 
   // Rotating loading messages
@@ -42,14 +42,14 @@ export default function LoadingScreen() {
       
       <AnimatePresence mode="wait">
         <motion.p
-          key={loadingIndex}
+          key={step === "detecting" ? "detecting" : loadingIndex}
           className="text-[14px] text-[#838589] font-medium tracking-wide h-6"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.3 }}
         >
-          {loadingMessages[loadingIndex]}
+          {step === "detecting" ? "Detecting spoken language..." : loadingMessages[loadingIndex]}
         </motion.p>
       </AnimatePresence>
     </div>
